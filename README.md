@@ -38,8 +38,10 @@ only safe behaviour.
 pip install git+https://github.com/suimajian/dpapi-config
 ```
 
-Windows only for encryption. The module imports fine everywhere; `available()`
-returns `False` elsewhere and the plaintext-reading path still works.
+Windows only for encryption. The module imports fine everywhere, `available()`
+returns `False` elsewhere, and the read path still works on a plaintext file —
+but the encryption functions (`protect`, `encrypt_config`, `save`) raise
+`CredentialError` rather than writing secrets in the clear.
 
 ## Use
 
@@ -79,6 +81,7 @@ work on single strings.
 | DPAPI unavailable, reading an encrypted value | `CredentialError` (ask the user again) |
 | Ciphertext from a different Windows user or machine | `CredentialError` |
 | Secret field holds a non-string (`"password": 12345`) | `CredentialError` — never silently written in the clear |
+| Secret field is `null` (not filled in yet) | left as `null`, not encrypted, save succeeds |
 | Value is a placeholder (`""`, `"sk-"`, …) | left as-is, not encrypted |
 | Path does not exist in the config | skipped |
 | Path goes through a list (`servers[0].token`) | not supported; list indices are not walked |
@@ -99,12 +102,13 @@ Deliberately not in this package, so you know what you are getting:
   will not work — use `icacls` / `SetFileSecurity` for that.
 - **No keychain or credential-manager backend.** It is DPAPI, nothing else; the
   ciphertext is only readable by the same Windows user on the same machine.
-- **No encryption of non-string values.** A number or a dict where a secret is
-  expected raises `CredentialError` instead of being written in the clear.
+- **No encryption of non-string values.** A number, list or dict where a secret is
+  expected raises `CredentialError` instead of being written in the clear. `null`
+  is the one exception: it means "not filled in yet" and is left alone.
 - **No list traversal.** `servers[0].token` is not a supported path; keep secrets
   as direct string keys.
-- **No cross-platform story.** On non-Windows the functions raise; this is not a
-  portable secrets store.
+- **Not portable.** Encryption raises off Windows; reading a plaintext config
+  still works there, but this is not a cross-platform secrets store.
 
 ## Status
 

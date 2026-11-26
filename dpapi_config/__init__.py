@@ -188,12 +188,16 @@ def decrypt_config(cfg: dict, paths: Iterable[Path_]) -> dict:
 def encrypt_config(cfg: dict, paths: Iterable[Path_], placeholders: Iterable[str] = ()) -> dict:
     """Encrypt in place and return the same dict. Placeholder values are skipped.
 
-    A sensitive field holding a non-string (``"password": 12345``) raises instead of
-    being left alone: silently skipping would write that value to disk in the clear,
-    which is the one thing this module promises not to do.
+    ``None`` is skipped as well: in a config it means "not filled in yet", and
+    raising on it would make the whole save fail for a form the user has not
+    completed. Everything else that is not a string (``"password": 12345``) raises
+    instead of being left alone: silently skipping would write that value to disk
+    in the clear, which is the one thing this module promises not to do.
     """
     skip = set(placeholders)
     for parent, key, value in _walk(cfg, paths):
+        if value is None:
+            continue
         if not isinstance(value, str):
             raise CredentialError(
                 f"field {key!r} must hold a string to be encrypted; got "

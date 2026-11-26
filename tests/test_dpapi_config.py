@@ -145,3 +145,11 @@ def test_load_rejects_non_object(tmp_path):
     path.write_text("[1, 2, 3]", encoding="utf-8")
     with pytest.raises(CredentialError):
         load(path, PATHS)
+
+
+def test_null_secret_is_left_as_null(tmp_path):
+    """``null`` means "not filled in yet": save must not fail, and must not encrypt."""
+    path = tmp_path / "config.json"
+    save(path, {"user": "me", "password": None}, PATHS)
+    assert json.loads(path.read_text(encoding="utf-8"))["password"] is None
+    assert load(path, PATHS)["password"] is None
