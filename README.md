@@ -15,6 +15,19 @@ No master password, no key file, no extra dependency — DPAPI derives the key f
 the logged-in Windows account, so there is nothing to store and nothing to leak
 alongside the config.
 
+## Install
+
+Not on PyPI yet — `pip install dpapi-config` will 404 until 0.1.0 is published.
+Install from the repository instead:
+
+```bash
+pip install git+https://github.com/suimajian/dpapi-config
+```
+
+The release workflow already builds the sdist and wheel (they are attached to the
+[releases](https://github.com/suimajian/dpapi-config/releases)); the publish step
+is waiting for credentials, so nothing has been uploaded to the index.
+
 ## Why this exists
 
 Most Python apps that need to remember a password put it in JSON in plaintext, or
@@ -32,11 +45,7 @@ returned the plaintext on failure, which meant a machine without DPAPI silently
 wrote passwords to disk while the UI said "encrypted". Refusing to write is the
 only safe behaviour.
 
-## Install
-
-```bash
-pip install git+https://github.com/suimajian/dpapi-config
-```
+## Platform
 
 Windows only for encryption. The module imports fine everywhere, `available()`
 returns `False` elsewhere, and the read path still works on a plaintext file —
