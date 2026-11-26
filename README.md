@@ -54,10 +54,18 @@ cfg["ai"]["api_key"] = "sk-new"
 save("config.json", cfg, PATHS, PLACEHOLDERS)      # ciphertext on disk
 ```
 
-`load()` also migrates a file that still holds plaintext: the first read encrypts
-those fields and writes the file back. The migration is one-way — older builds
-that do not know about `dpapi:` envelopes will read the file as if the secret were
-missing, so ship both changes together.
+`load()` does **not** write, by default. Pass `migrate=True` to encrypt a file that
+still holds plaintext — the first read then rewrites it in place:
+
+```python
+cfg = load("config.json", PATHS, PLACEHOLDERS, migrate=True)
+```
+
+The migration is one-way: older builds that do not know about `dpapi:` envelopes
+will read the file as if the secret were missing, so ship both changes together.
+If the file cannot be rewritten (read-only media, a directory the user cannot
+write to), `load` emits a `RuntimeWarning` and returns the decrypted values —
+reading never fails because writing did.
 
 Everything else the package does is mechanical: `encrypt_config` /
 `decrypt_config` operate on a dict you already loaded, `protect` / `unprotect`
@@ -70,9 +78,17 @@ work on single strings.
 | DPAPI unavailable, writing a config with secrets | `CredentialError`, nothing written |
 | DPAPI unavailable, reading an encrypted value | `CredentialError` (ask the user again) |
 | Ciphertext from a different Windows user or machine | `CredentialError` |
+| Secret field holds a non-string (`"password": 12345`) | `CredentialError` — never silently written in the clear |
 | Value is a placeholder (`""`, `"sk-"`, …) | left as-is, not encrypted |
 | Path does not exist in the config | skipped |
-| Save interrupted | the temp file is removed; the old config is untouched (`mkstemp` + `os.replace`) |
+| Path goes through a list (`servers[0].token`) | not supported; list indices are not walked |
+| `load()` on a plaintext file | returns values, writes nothing unless `migrate=True` |
+| `migrate=True` on a read-only file | `RuntimeWarning`, values still returned |
+| Save interrupted | temp file removed, old config untouched, data is `fsync`ed before the rename |
+
+The file permissions are whatever the process creates — this module does not
+tighten the ACL to the current user. If the config lives somewhere other than the
+user's own profile, do that yourself (`icacls` or `SetFileSecurity`).
 
 ## Tests
 

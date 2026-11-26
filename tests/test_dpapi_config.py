@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 
 import pytest
 
@@ -91,12 +92,44 @@ def test_save_and_load_persist_ciphertext(tmp_path):
 
 
 @win_only
-def test_load_migrates_plaintext_in_place(tmp_path):
+def test_load_migrates_plaintext_in_place_when_asked(tmp_path):
     path = tmp_path / "config.json"
     path.write_text(json.dumps({"password": "legacy"}), encoding="utf-8")
 
-    assert load(path, PATHS)["password"] == "legacy"
+    assert load(path, PATHS, migrate=True)["password"] == "legacy"
     assert json.loads(path.read_text(encoding="utf-8"))["password"].startswith("dpapi:")
+
+
+@win_only
+def test_load_does_not_write_by_default(tmp_path):
+    path = tmp_path / "config.json"
+    path.write_text(json.dumps({"password": "legacy"}), encoding="utf-8")
+    before = path.stat().st_mtime_ns
+
+    assert load(path, PATHS)["password"] == "legacy"
+    assert path.stat().st_mtime_ns == before
+    assert json.loads(path.read_text(encoding="utf-8"))["password"] == "legacy"
+
+
+@win_only
+def test_load_survives_a_read_only_file(tmp_path):
+    """A read-only config must still load when migration was requested."""
+    path = tmp_path / "config.json"
+    path.write_text(json.dumps({"password": "legacy"}), encoding="utf-8")
+    os.chmod(path, 0o444)
+    try:
+        with pytest.warns(RuntimeWarning):
+            cfg = load(path, PATHS, migrate=True)
+        assert cfg["password"] == "legacy"
+    finally:
+        os.chmod(path, 0o666)
+
+
+def test_non_string_secret_raises_instead_of_writing_plaintext(tmp_path):
+    path = tmp_path / "config.json"
+    with pytest.raises(CredentialError):
+        save(path, {"password": 12345}, PATHS)
+    assert not path.exists(), "nothing may be written when a secret cannot be encrypted"
 
 
 @win_only

@@ -33,6 +33,7 @@ import ctypes
 import json
 import os
 import tempfile
+import warnings
 from ctypes import wintypes
 from typing import Any, Iterable, Sequence
 
@@ -185,10 +186,21 @@ def decrypt_config(cfg: dict, paths: Iterable[Path_]) -> dict:
 
 
 def encrypt_config(cfg: dict, paths: Iterable[Path_], placeholders: Iterable[str] = ()) -> dict:
-    """Encrypt in place and return the same dict. Placeholder values are skipped."""
+    """Encrypt in place and return the same dict. Placeholder values are skipped.
+
+    A sensitive field holding a non-string (``"password": 12345``) raises instead of
+    being left alone: silently skipping would write that value to disk in the clear,
+    which is the one thing this module promises not to do.
+    """
     skip = set(placeholders)
     for parent, key, value in _walk(cfg, paths):
-        if isinstance(value, str) and value not in skip and not is_protected(value):
+        if not isinstance(value, str):
+            raise CredentialError(
+                f"field {key!r} must hold a string to be encrypted; got "
+                f"{type(value).__name__}. Convert it before saving, or drop it from "
+                f"the paths list if it is not actually a secret."
+            )
+        if value not in skip and not is_protected(value):
             parent[key] = protect(value)
     return cfg
 
@@ -202,23 +214,34 @@ def _needs_migration(cfg: dict, paths: Iterable[Path_], placeholders: Iterable[s
 
 
 def load(path: str | os.PathLike[str], paths: Iterable[Path_],
-         placeholders: Iterable[str] = ()) -> dict:
+         placeholders: Iterable[str] = (), *, migrate: bool = False) -> dict:
     """Read *path* and return a dict with decrypted values.
 
-    Plaintext secrets found on disk are encrypted and written back immediately,
-    so a file written by an older version of the app becomes encrypted on first
-    read. The migration is one-way: older builds will no longer be able to read
-    it.
+    ``migrate=True`` encrypts plaintext secrets found on disk and writes the file
+    back, so a config written by an older build becomes encrypted after one read.
+    It is off by default: reading should not write. A read-only config (Program
+    Files, a network share, a signed image) still loads, and a failed migration is
+    reported as a warning rather than turning ``load`` into an error.
+
+    The migration is one-way: older builds cannot read ``dpapi:`` values.
     """
     paths = tuple(paths)
     with open(path, "r", encoding="utf-8") as f:
         cfg = json.load(f)
     if not isinstance(cfg, dict):
         raise CredentialError(f"{path} does not contain a JSON object")
-    migrate = _needs_migration(cfg, paths, placeholders)
+    needs_migration = migrate and _needs_migration(cfg, paths, placeholders)
     decrypt_config(cfg, paths)
-    if migrate and available():
-        save(path, cfg, paths, placeholders)
+    if needs_migration and available():
+        try:
+            save(path, cfg, paths, placeholders)
+        except OSError as exc:
+            warnings.warn(
+                f"could not encrypt {path} in place ({exc}); continuing with the "
+                f"decrypted values in memory",
+                RuntimeWarning,
+                stacklevel=2,
+            )
     return cfg
 
 
@@ -243,10 +266,29 @@ def save(path: str | os.PathLike[str], cfg: dict, paths: Iterable[Path_],
         with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as f:
             json.dump(disk, f, indent=4, ensure_ascii=False)
             f.write("\n")
+            f.flush()
+            # Without fsync the rename can land before the data does, and a power
+            # cut leaves the new name pointing at a truncated file.
+            os.fsync(f.fileno())
         os.replace(tmp, path)
+        _fsync_directory(parent)
     except BaseException:
         try:
             os.unlink(tmp)
         except OSError:
             pass
         raise
+
+
+def _fsync_directory(directory: str) -> None:
+    """Flush the directory entry so the rename itself survives a power loss."""
+    try:
+        fd = os.open(directory, os.O_RDONLY)
+    except OSError:
+        return                      # not supported on Windows; best effort
+    try:
+        os.fsync(fd)
+    except OSError:
+        pass
+    finally:
+        os.close(fd)
