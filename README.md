@@ -17,16 +17,9 @@ alongside the config.
 
 ## Install
 
-Not on PyPI yet — `pip install dpapi-config` will 404 until 0.1.0 is published.
-Install from the repository instead:
-
 ```bash
-pip install git+https://github.com/suimajian/dpapi-config
+pip install dpapi-config
 ```
-
-The release workflow already builds the sdist and wheel (they are attached to the
-[releases](https://github.com/suimajian/dpapi-config/releases)); the publish step
-is waiting for credentials, so nothing has been uploaded to the index.
 
 ## Why this exists
 
@@ -121,9 +114,9 @@ Deliberately not in this package, so you know what you are getting:
 
 ## Status
 
-0.1.0 — not on PyPI yet. A tag (`v*`) builds sdist + wheel and uploads them as a
-workflow artifact; the publish step only runs when a `PYPI_API_TOKEN` repository
-secret exists, so nothing is published by accident.
+0.1.0 — published on PyPI via Trusted Publishing (OIDC, no token stored in the
+repository). Tags (`v*`) still build sdist + wheel and attach them to the GitHub
+release; the upload itself runs from `publish.yml` on demand.
 
 ## Tests
 
