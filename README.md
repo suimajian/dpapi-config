@@ -90,6 +90,28 @@ The file permissions are whatever the process creates — this module does not
 tighten the ACL to the current user. If the config lives somewhere other than the
 user's own profile, do that yourself (`icacls` or `SetFileSecurity`).
 
+## Scope and non-goals
+
+Deliberately not in this package, so you know what you are getting:
+
+- **No ACL tightening.** The file keeps whatever permissions the process creates.
+  Putting a config in a shared location and relying on this module to protect it
+  will not work — use `icacls` / `SetFileSecurity` for that.
+- **No keychain or credential-manager backend.** It is DPAPI, nothing else; the
+  ciphertext is only readable by the same Windows user on the same machine.
+- **No encryption of non-string values.** A number or a dict where a secret is
+  expected raises `CredentialError` instead of being written in the clear.
+- **No list traversal.** `servers[0].token` is not a supported path; keep secrets
+  as direct string keys.
+- **No cross-platform story.** On non-Windows the functions raise; this is not a
+  portable secrets store.
+
+## Status
+
+0.1.0 — not on PyPI yet. A tag (`v*`) builds sdist + wheel and uploads them as a
+workflow artifact; the publish step only runs when a `PYPI_API_TOKEN` repository
+secret exists, so nothing is published by accident.
+
 ## Tests
 
 ```bash
