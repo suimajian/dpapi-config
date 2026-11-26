@@ -153,3 +153,15 @@ def test_null_secret_is_left_as_null(tmp_path):
     save(path, {"user": "me", "password": None}, PATHS)
     assert json.loads(path.read_text(encoding="utf-8"))["password"] is None
     assert load(path, PATHS)["password"] is None
+
+
+def test_version_matches_pyproject():
+    import pathlib
+    import re
+
+    import dpapi_config
+
+    repo = pathlib.Path(__file__).resolve().parents[1]
+    declared = re.search(r'^version = "([^"]+)"', (repo / "pyproject.toml").read_text(encoding="utf-8"), re.M)
+    assert declared, "version missing from pyproject.toml"
+    assert declared.group(1) == dpapi_config.__version__

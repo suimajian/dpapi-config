@@ -114,7 +114,7 @@ Deliberately not in this package, so you know what you are getting:
 
 ## Status
 
-0.1.1 — on PyPI (`pip install dpapi-config`); 0.1.0 is yanked because its project page
+0.1.2 — on PyPI (`pip install dpapi-config`); 0.1.0 is yanked because its project page
 still carried the pre-release README. Trusted Publishing (OIDC) does the upload,
 so no token lives in this repository. Tags (`v*`) build sdist + wheel and attach
 them to the GitHub release.

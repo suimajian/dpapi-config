@@ -28,6 +28,8 @@ Example::
 
 from __future__ import annotations
 
+__version__ = "0.1.2"
+
 import base64
 import ctypes
 import json
